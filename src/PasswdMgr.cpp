@@ -103,8 +103,19 @@ bool PasswdMgr::changePasswd(const char *name, const char *passwd) {
 
 bool PasswdMgr::readUser(FileFD &pwfile, std::string &name, std::vector<uint8_t> &hash, std::vector<uint8_t> &salt)
 {
-   // Insert your perfect code here!
 
+   // Insert your perfect code here!
+   //pwfile.readFD(name);
+   if (pwfile.readStr(name) == 0){
+      return false;
+   }   
+   
+   std::string tempString;
+
+   pwfile.readBytes(hash, 32);
+   pwfile.readBytes(salt, 16);
+   pwfile.readStr(tempString);
+   //std::cout << "in readUser " << std::endl;
    return true;
 }
 
@@ -188,6 +199,30 @@ bool PasswdMgr::findUser(const char *name, std::vector<uint8_t> &hash, std::vect
 void PasswdMgr::hashArgon2(std::vector<uint8_t> &ret_hash, std::vector<uint8_t> &ret_salt, 
                            const char *in_passwd, std::vector<uint8_t> *in_salt) {
    // Hash those passwords!!!!
+   int HASHLEN = 32;
+   int SALTLEN = 16;
+
+   uint8_t hash1[HASHLEN];
+
+   uint8_t salt[SALTLEN];
+   memset( salt, 0x00, SALTLEN );
+
+   //not needed
+   uint8_t *pwd = (uint8_t *)strdup(in_passwd);
+   uint32_t pwdlen = strlen((char *)pwd);
+
+   uint32_t t_cost = 2;            // 1-pass computation
+   uint32_t m_cost = (1<<16);      // 64 mebibytes memory usage
+   uint32_t parallelism = 1;       // number of threads and lanes
+
+    // high-level API
+   argon2i_hash_raw(t_cost, m_cost, parallelism, pwd, pwdlen, in_salt, SALTLEN, hash1, HASHLEN);
+
+   for (int i = 0; i < 32; i++){
+      ret_hash.push_back(hash1[i]);
+   }
+
+   //delete
 
 }
 
@@ -200,5 +235,59 @@ void PasswdMgr::hashArgon2(std::vector<uint8_t> &ret_hash, std::vector<uint8_t> 
 
 void PasswdMgr::addUser(const char *name, const char *passwd) {
    // Add those users!
+   
+   std::vector<uint8_t> ret_hash;
+   ret_hash.clear();
+   std::vector<uint8_t> ret_salt;
+   std::vector<uint8_t> in_salt{1,7,7,5,7,1,3,6,1,5,4,5,7,5,4,9};
+
+   /*
+   for (int i = 0; i < 16; i++){
+      int randomNum = rand() % 9;
+      in_salt.push_back(randomNum);
+   }
+   */
+
+   hashArgon2(ret_hash, ret_salt, passwd, &in_salt);
+
+   std::cout << "hash: ";
+   std::string hashStr;
+
+   for( int i=0; i< ret_hash.size(); i++ ) 
+   {
+      printf("%02x", ret_hash.at(i));
+      //std::cout << static_cast<unsigned int>(ret_hash.at(i));
+   } 
+   std::cout << "\n";
+
+   
+
+   std::cout << "salt: ";
+   for( int i=0; i< in_salt.size(); i++ ) 
+   {
+      printf( "%02x", in_salt.at(i) );
+   }
+   std::cout << "\n";
+
+   
+   
+   //adding username, passwd, and salt to file
+   FileFD pwfile(_pwd_file.c_str());
+
+   // You may need to change this code for your specific implementation
+
+   if (!pwfile.openFile(FileFD::writefd))
+      throw pwfile_error("Could not open passwd file for reading");
+
+   // Password file should be in the format username\n{32 byte hash}{16 byte salt}\n
+
+   pwfile.writeFD(name);
+   pwfile.writeFD("\n");
+   pwfile.writeBytes(ret_hash);
+   pwfile.writeBytes(in_salt);
+   pwfile.writeFD("\n");
+
+   pwfile.closeFD();
+   
 }
 

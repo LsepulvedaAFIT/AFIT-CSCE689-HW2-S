@@ -4,13 +4,17 @@
 #include <cstring>
 #include <algorithm>
 #include <iostream>
+#include <fstream>
+#include <memory>
 #include "TCPConn.h"
 #include "strfuncts.h"
+#include "PasswdMgr.h"
 
 // The filename/path of the password file
 const char pwdfilename[] = "passwd";
 
 TCPConn::TCPConn(){ // LogMgr &server_log):_server_log(server_log) {
+   this->PWMgr = std::make_unique<PasswdMgr>(pwdfilename);
 
 }
 
@@ -63,6 +67,7 @@ void TCPConn::startAuthentication() {
    _status = s_username;
 
    _connfd.writeFD("Username: "); 
+
 }
 
 /**********************************************************************************************
@@ -77,6 +82,8 @@ void TCPConn::handleConnection() {
    timespec sleeptime;
    sleeptime.tv_sec = 0;
    sleeptime.tv_nsec = 100000000;
+
+   //std::cout << "_status: " << _status << std::endl;
 
    try {
       switch (_status) {
@@ -120,6 +127,33 @@ void TCPConn::handleConnection() {
 
 void TCPConn::getUsername() {
    // Insert your mind-blowing code here
+   //std::cout << "In useName()" << std::endl; //testing
+   //Check if user has inputed name
+   if (!_connfd.hasData())
+      return;
+   std::string userNameInput;
+   if (!getUserInput(userNameInput))
+      return;
+   //lower(userNameInput);
+
+   //store name in object
+   this->_username = userNameInput;   
+   std::cout << "Got User Name: " << _username << std::endl;//testing
+
+   if (!PWMgr->checkUser(this->_username.c_str()) )
+   {
+      sendText("Username not recognized\n");
+      disconnect();
+      std::cout << "Username not found" << std::endl;
+   }
+   else{
+
+      std::cout << "Username found" << std::endl;
+   }
+   //transitions to password state
+   _connfd.writeFD("Password: "); 
+   this->_status = s_passwd;
+
 }
 
 /**********************************************************************************************
@@ -131,7 +165,21 @@ void TCPConn::getUsername() {
  **********************************************************************************************/
 
 void TCPConn::getPasswd() {
-   // Insert your astounding code here
+   // Insert your mind-blowing code here
+   std::cout << "In getPasswd()" << std::endl; //testing
+   //Check if user has inputed passwd
+   if (!_connfd.hasData())
+      return;
+   std::string userPasswdInput;
+   if (!getUserInput(userPasswdInput))
+      return;
+   //lower(userNameInput);
+
+   //store passwd in object
+   //this->_ = userPasswdInput; 
+   std::cout << "Got User passwd: " << userPasswdInput << std::endl;//testing
+
+   this->PWMgr->checkPasswd(this->_username.c_str(), userPasswdInput.c_str());
 }
 
 /**********************************************************************************************
@@ -284,5 +332,28 @@ bool TCPConn::isConnected() {
  **********************************************************************************************/
 void TCPConn::getIPAddrStr(std::string &buf) {
    return _connfd.getIPAddrStr(buf);
+}
+
+bool TCPConn::isNewIPAllowed(std::string inputIP){
+   std::ifstream whitelistFile("whitelist");
+   if(!whitelistFile){
+      std::cout << "whitelist file not found" << std::endl;
+      return false;
+   }
+   
+   if (whitelistFile.is_open()){
+      std::string line;
+      while(whitelistFile >> line){
+         //std::cout << "IP: " << inputIP << ", line: " << line << std::endl;//
+         if (inputIP == line){
+            std::cout << "New connection IP: "<< inputIP << " , authorized from whitelist" << std::endl;
+            return true;
+         }
+      }
+   }
+
+   std::cout << "Match NOT FOUND!" << std::endl;
+   return false;
+
 }
 

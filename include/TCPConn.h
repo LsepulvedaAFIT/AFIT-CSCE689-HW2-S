@@ -2,6 +2,8 @@
 #define TCPCONN_H
 
 #include "FileDesc.h"
+#include "PasswdMgr.h"
+
 
 const int max_attempts = 2;
 
@@ -36,6 +38,8 @@ public:
    void getIPAddrStr(std::string &buf);
    const char *getUsernameStr() { return _username.c_str(); };
 
+   bool isNewIPAllowed(std::string inputIP);
+
 private:
 
 
@@ -52,6 +56,8 @@ private:
    std::string _newpwd; // Used to store user input for changing passwords
 
    int _pwd_attempts = 0;
+
+   std::unique_ptr<PasswdMgr> PWMgr;
 };
 
 

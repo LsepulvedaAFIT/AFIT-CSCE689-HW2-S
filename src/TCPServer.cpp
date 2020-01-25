@@ -71,15 +71,26 @@ void TCPServer::listenSvr() {
             // _server_log.strerrLog("Data received on socket but failed to accept.");
             continue;
          }
-         std::cout << "***Got a connection***\n";
-
-         _connlist.push_back(std::unique_ptr<TCPConn>(new_conn));
-
+         
          // Get their IP Address string to use in logging
          std::string ipaddr_str;
          new_conn->getIPAddrStr(ipaddr_str);
 
+         std::cout << "Client IP: " << ipaddr_str << std::endl;//testing
 
+         //check is the client ip address on the whitelist
+         if ( !new_conn->isNewIPAllowed(ipaddr_str) ){
+            std::cout << "This IP address is not authorized" << std::endl;
+            new_conn->sendText("Not Authorized To Log into System\n");
+            new_conn->disconnect();
+            continue;  
+         }
+
+         std::cout << "***Got a connection***\n";
+
+         _connlist.push_back(std::unique_ptr<TCPConn>(new_conn));
+
+         
          new_conn->sendText("Welcome to the CSCE 689 Server!\n");
 
          // Change this later
