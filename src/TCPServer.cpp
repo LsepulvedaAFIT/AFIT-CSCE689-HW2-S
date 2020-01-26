@@ -13,6 +13,7 @@
 #include "TCPServer.h"
 
 TCPServer::TCPServer(){ // :_server_log("server.log", 0) {
+   this->_serverLog->log("Server started,");
 }
 
 
@@ -81,16 +82,21 @@ void TCPServer::listenSvr() {
          //check is the client ip address on the whitelist
          if ( !new_conn->isNewIPAllowed(ipaddr_str) ){
             std::cout << "This IP address is not authorized" << std::endl;
+            std::stringstream ss;
+            ss << "IP address \"" << ipaddr_str << "\" NOT on whitelist attempted to connect,";
+            this->_serverLog->log(ss.str());
             new_conn->sendText("Not Authorized To Log into System\n");
             new_conn->disconnect();
             continue;  
          }
 
          std::cout << "***Got a connection***\n";
+         std::stringstream ss;
+         ss << "IP address \"" << ipaddr_str << "\" on whitelist connected,";
+         this->_serverLog->log(ss.str());
 
          _connlist.push_back(std::unique_ptr<TCPConn>(new_conn));
 
-         
          new_conn->sendText("Welcome to the CSCE 689 Server!\n");
 
          // Change this later

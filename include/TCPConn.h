@@ -40,6 +40,8 @@ public:
 
    bool isNewIPAllowed(std::string inputIP);
 
+   void log(std::string logString);
+
 private:
 
 

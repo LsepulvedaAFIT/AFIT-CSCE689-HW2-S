@@ -6,6 +6,7 @@
 #include <iostream>
 #include <fstream>
 #include <memory>
+#include <sstream>
 #include "TCPConn.h"
 #include "strfuncts.h"
 #include "PasswdMgr.h"
@@ -15,7 +16,6 @@ const char pwdfilename[] = "passwd";
 
 TCPConn::TCPConn(){ // LogMgr &server_log):_server_log(server_log) {
    this->PWMgr = std::make_unique<PasswdMgr>(pwdfilename);
-
 }
 
 
@@ -63,6 +63,7 @@ int TCPConn::sendText(const char *msg, int size) {
 
 void TCPConn::startAuthentication() {
 
+   this->_pwd_attempts = 0;
    // Skipping this for now
    _status = s_username;
 
@@ -143,6 +144,11 @@ void TCPConn::getUsername() {
    if (!PWMgr->checkUser(this->_username.c_str()) )
    {
       sendText("Username not recognized\n");
+      std::string IPAddress;
+      this->getIPAddrStr(IPAddress);
+      std::stringstream ss;
+      ss << "Username \"" << _username << "\" NOT recognized, " << "IP: \"" << IPAddress << "\"";
+      log(ss.str());
       disconnect();
       std::cout << "Username not found" << std::endl;
    }
@@ -166,7 +172,7 @@ void TCPConn::getUsername() {
 
 void TCPConn::getPasswd() {
    // Insert your mind-blowing code here
-   std::cout << "In getPasswd()" << std::endl; //testing
+   //std::cout << "In getPasswd()" << std::endl; //testing
    //Check if user has inputed passwd
    if (!_connfd.hasData())
       return;
@@ -179,7 +185,34 @@ void TCPConn::getPasswd() {
    //this->_ = userPasswdInput; 
    std::cout << "Got User passwd: " << userPasswdInput << std::endl;//testing
 
-   this->PWMgr->checkPasswd(this->_username.c_str(), userPasswdInput.c_str());
+   bool validPW = this->PWMgr->checkPasswd(this->_username.c_str(), userPasswdInput.c_str());
+
+   if (!validPW)
+   {
+      std::cout << "invalid password" << std::endl;
+      _connfd.writeFD("Invalid Password\n"); 
+      this->_pwd_attempts++;
+      if (this->_pwd_attempts == 2 ){
+         std::string IPAddress;
+         this->getIPAddrStr(IPAddress);
+         std::stringstream ss;
+         ss << "Username \"" << _username << "\" failed to password twice, " << "IP: \"" << IPAddress << "\"";
+         log(ss.str());
+         _connfd.writeFD("Too many login attempts\n"); 
+         disconnect();
+      }
+      _connfd.writeFD("Password: "); 
+   }
+   else{
+      std::cout << "Password verified" << std::endl;
+      std::string IPAddress;
+      this->getIPAddrStr(IPAddress);
+      std::stringstream ss;
+      ss << "Username \"" << _username << "\" succesful login, " << "IP: \"" << IPAddress << "\"";
+      log(ss.str());
+      _connfd.writeFD("Log in successful\n");
+      this->_status = s_menu;
+   }
 }
 
 /**********************************************************************************************
@@ -193,6 +226,16 @@ void TCPConn::getPasswd() {
 
 void TCPConn::changePassword() {
    // Insert your amazing code here
+   if (!_connfd.hasData())
+      return;
+   std::string newPasswdInput;
+   if (!getUserInput(newPasswdInput))
+      return;
+
+   this->PWMgr->changePasswd(this->_username.c_str(), newPasswdInput.c_str());
+
+   this->_status = s_menu;
+
 }
 
 
@@ -313,6 +356,11 @@ void TCPConn::sendMenu() {
  *    Throws: runtime_error for unrecoverable issues
  **********************************************************************************************/
 void TCPConn::disconnect() {
+   std::string IPAddress;
+   this->getIPAddrStr(IPAddress);
+   std::stringstream ss;
+   ss << "Username \"" << _username << "\" disconnected, " << "IP: \"" << IPAddress << "\"";
+   log(ss.str());
    _connfd.closeFD();
 }
 
@@ -357,3 +405,28 @@ bool TCPConn::isNewIPAllowed(std::string inputIP){
 
 }
 
+void TCPConn::log(std::string logString){
+
+   std::string logFileName = "server.log";
+
+   FileFD logFile(logFileName.c_str());
+
+   
+   //Note: File has to exist.
+   //if (!pwfile.openFile(FileFD::writefd))
+   if (!logFile.openFile(FileFD::appendfd))
+      throw pwfile_error("Could not open log file for writing");
+
+   logFile.writeFD(logString);
+
+   // current date/time based on current system
+   time_t now = time(0);
+   
+   // convert now to string form
+   char* date_Time = ctime(&now);
+
+   logFile.writeFD(" ");
+   logFile.writeFD(date_Time);
+
+   logFile.closeFD();
+}
