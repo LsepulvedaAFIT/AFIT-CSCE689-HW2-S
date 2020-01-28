@@ -14,6 +14,7 @@ const int hashlen = 32;
 const int saltlen = 16;
 
 PasswdMgr::PasswdMgr(const char *pwd_file):_pwd_file(pwd_file) {
+   //seeds the random generator with the time
    srand(time(NULL));   
 
 }
@@ -31,6 +32,7 @@ PasswdMgr::~PasswdMgr() {
  *******************************************************************************************/
 
 bool PasswdMgr::checkUser(const char *name) {
+   //creates empty container to used the find user
    std::vector<uint8_t> passwd, salt;
 
    bool result = findUser(name, passwd, salt);
@@ -83,25 +85,26 @@ bool PasswdMgr::checkPasswd(const char *name, const char *passwd) {
  *******************************************************************************************/
 
 bool PasswdMgr::changePasswd(const char *name, const char *passwd) {
-
-   //std::vector<uint8_t> new_hash{1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1};
-   std::vector<uint8_t> ret_hash;
-   ret_hash.clear();
-   std::vector<uint8_t> ret_salt;
-   std::vector<uint8_t> in_salt{1,7,7,5,7,1,3,6,1,5,4,5,7,5,4,9};
+   //container that stores the hashed passwd
+   std::vector<uint8_t> ret_hash{};
+   std::vector<uint8_t> ret_salt{};
+   //std::vector<uint8_t> in_salt{1,7,7,5,7,1,3,6,1,5,4,5,7,5,4,9};//testing
+   std::vector<uint8_t> in_salt{};
+   
    // Insert your insane code here
+   //Keeps track of where it needs to overwrite passwd file
    int offset = 0;
 
+   //opens password file to find user, hash, & salt
    FileFD pwfile(_pwd_file.c_str());
-
-   // You may need to change this code for your specific implementation
-
    if (!pwfile.openFile(FileFD::readfd))
       throw pwfile_error("Could not open passwd file for reading");
 
    bool eof = false;
    
    while (!eof) {
+      ret_hash.clear();
+      ret_salt.clear();
       std::string tempBuffer;
       ssize_t bytes = pwfile.readStr(tempBuffer);
       offset = offset + bytes + 1;
@@ -116,7 +119,7 @@ bool PasswdMgr::changePasswd(const char *name, const char *passwd) {
          break;
       }
       pwfile.readBytes(ret_hash, 32);
-      pwfile.readBytes(ret_salt, 16);
+      pwfile.readBytes(in_salt, 16);
       offset = offset + 48;
       tempBuffer.clear();
       ssize_t b2 = pwfile.readStr(tempBuffer);
@@ -131,19 +134,12 @@ bool PasswdMgr::changePasswd(const char *name, const char *passwd) {
    FileFD pwfile2(_pwd_file.c_str());
    if (!pwfile2.openFile(FileFD::writefd))
       throw pwfile_error("Could not open passwd file for reading");
-   
-   //writeUser(pwfile2, nameString, new_hash, ret_salt );
-
-   //int results = 6;
-   std::string ORString("NewHash");
 
    int fd = pwfile2.getFD();
 
    lseek(fd, offset, SEEK_SET);
 
-   pwfile2.writeBytes(ret_hash);
-   pwfile2.writeBytes(in_salt);
-   pwfile2.writeFD("\n");
+   writeHash(pwfile2, ret_hash, ret_salt);
 
    pwfile2.closeFD();
 
@@ -178,7 +174,7 @@ bool PasswdMgr::readUser(FileFD &pwfile, std::string &name, std::vector<uint8_t>
    pwfile.readBytes(hash, 32);
    pwfile.readBytes(salt, 16);
    pwfile.readStr(tempString);
-   //std::cout << "in readUser " << std::endl;
+
    return true;
 }
 
@@ -207,6 +203,16 @@ int PasswdMgr::writeUser(FileFD &pwfile, std::string &name, std::vector<uint8_t>
    return results; 
 }
 
+int PasswdMgr::writeHash(FileFD &pwfile, std::vector<uint8_t> &hash, std::vector<uint8_t> &salt)
+{
+   int results;
+   results = pwfile.writeBytes(hash);
+   results = pwfile.writeBytes(salt);
+   results = pwfile.writeFD("\n");
+
+   return results; 
+}
+
 /*****************************************************************************************************
  * findUser - Reads in the password file, finding the user (if they exist) and populating the two
  *            passed in vectors with their hash and salt
@@ -227,13 +233,15 @@ bool PasswdMgr::findUser(const char *name, std::vector<uint8_t> &hash, std::vect
 
    // You may need to change this code for your specific implementation
 
+   //open passwd file for reading
    if (!pwfile.openFile(FileFD::readfd))
       throw pwfile_error("Could not open passwd file for reading");
 
    // Password file should be in the format username\n{32 byte hash}{16 byte salt}\n
+   // reads file until the find the specified name
    bool eof = false;
    while (!eof) {
-      std::string uname;
+      std::string uname{};
 
       if (!readUser(pwfile, uname, hash, salt)) {
          eof = true;
@@ -273,8 +281,20 @@ void PasswdMgr::hashArgon2(std::vector<uint8_t> &ret_hash, std::vector<uint8_t> 
    uint8_t salt[SALTLEN];
    memset( salt, 0x00, SALTLEN );
 
-   for (int i = 0; i < 16; i++){
-      salt[i] = in_salt->at(i);
+   if (in_salt->empty())
+   {
+      ret_salt.clear();
+      for (int i = 0; i < 16; i++){
+         int randomNum = rand() % 30;
+         ret_salt.push_back(randomNum);
+         salt[i] = randomNum;
+      }
+   }
+   else
+   {
+      for (int i = 0; i < 16; i++){
+         salt[i] = in_salt->at(i);
+      }
    }
 
    //not needed
@@ -306,54 +326,33 @@ void PasswdMgr::hashArgon2(std::vector<uint8_t> &ret_hash, std::vector<uint8_t> 
  ****************************************************************************************************/
 
 void PasswdMgr::addUser(const char *name, const char *passwd) {
+   //coverts name to string for easier processing
    std::string nameStr(name);
 
    // Add those users!
-   
    std::vector<uint8_t> ret_hash;
-   ret_hash.clear();
    std::vector<uint8_t> ret_salt;
    //std::vector<uint8_t> in_salt{1,7,7,5,7,1,3,6,1,5,4,5,7,5,4,9};//Testing
    std::vector<uint8_t> in_salt{};
 
-   
+   //creates a random 16 byte salt
    for (int i = 0; i < 16; i++){
-      int randomNum = rand() % 9;
+      int randomNum = rand() % 30;
       in_salt.push_back(randomNum);
    }
    
-
+   //hashes passwd with Argon2 function
    hashArgon2(ret_hash, ret_salt, passwd, &in_salt);
-
-   std::cout << "hash: ";
-   std::string hashStr;
-
-   for( int i=0; i< ret_hash.size(); i++ ) 
-   {
-      printf("%02x", ret_hash.at(i));
-      //std::cout << static_cast<unsigned int>(ret_hash.at(i));
-   } 
-   std::cout << "\n";
-
-   
-
-   std::cout << "salt: ";
-   for( int i=0; i< in_salt.size(); i++ ) 
-   {
-      printf( "%02x", in_salt.at(i) );
-   }
-   std::cout << "\n";
-
-   
    
    //adding username, passwd, and salt to file
    FileFD pwfile(_pwd_file.c_str());
 
+   //error checking that file open
    if (!pwfile.openFile(FileFD::appendfd))
       throw pwfile_error("Could not open passwd file for reading");
 
+   
    // Password file should be in the format username\n{32 byte hash}{16 byte salt}\n
-
    writeUser(pwfile, nameStr, ret_hash, in_salt);
 
    pwfile.closeFD();

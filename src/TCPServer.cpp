@@ -12,8 +12,8 @@
 #include <sstream>
 #include "TCPServer.h"
 
-TCPServer::TCPServer(){ // :_server_log("server.log", 0) {
-   this->_serverLog->log("Server started,");
+TCPServer::TCPServer(){ 
+   this->_serverLog = std::make_unique<TCPConn>();
 }
 
 
@@ -33,6 +33,7 @@ void TCPServer::bindSvr(const char *ip_addr, short unsigned int port) {
    struct sockaddr_in servaddr;
 
    // _server_log.writeLog("Server started.");
+   this->_serverLog->log(TCPConn::serverStart);
 
    // Set the socket to nonblocking
    _sockfd.setNonBlocking();
@@ -82,18 +83,16 @@ void TCPServer::listenSvr() {
          //check is the client ip address on the whitelist
          if ( !new_conn->isNewIPAllowed(ipaddr_str) ){
             std::cout << "This IP address is not authorized" << std::endl;
-            std::stringstream ss;
-            ss << "IP address \"" << ipaddr_str << "\" NOT on whitelist attempted to connect,";
-            this->_serverLog->log(ss.str());
+            //logs login attempt
+            this->_serverLog->log(ipaddr_str, TCPConn::newConn_NOT_WL);
             new_conn->sendText("Not Authorized To Log into System\n");
             new_conn->disconnect();
             continue;  
          }
 
          std::cout << "***Got a connection***\n";
-         std::stringstream ss;
-         ss << "IP address \"" << ipaddr_str << "\" on whitelist connected,";
-         this->_serverLog->log(ss.str());
+         
+         this->_serverLog->log(ipaddr_str, TCPConn::newConn_ON_WL);
 
          _connlist.push_back(std::unique_ptr<TCPConn>(new_conn));
 

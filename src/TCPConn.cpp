@@ -62,11 +62,11 @@ int TCPConn::sendText(const char *msg, int size) {
  **********************************************************************************************/
 
 void TCPConn::startAuthentication() {
-
+   //initializes attempts to zero
    this->_pwd_attempts = 0;
-   // Skipping this for now
+   //transition username state
    _status = s_username;
-
+   //client console output
    _connfd.writeFD("Username: "); 
 
 }
@@ -84,6 +84,7 @@ void TCPConn::handleConnection() {
    sleeptime.tv_sec = 0;
    sleeptime.tv_nsec = 100000000;
 
+   //testing
    //std::cout << "_status: " << _status << std::endl;
 
    try {
@@ -128,32 +129,28 @@ void TCPConn::handleConnection() {
 
 void TCPConn::getUsername() {
    // Insert your mind-blowing code here
-   //std::cout << "In useName()" << std::endl; //testing
    //Check if user has inputed name
    if (!_connfd.hasData())
       return;
    std::string userNameInput;
    if (!getUserInput(userNameInput))
       return;
-   //lower(userNameInput);
 
-   //store name in object
+   //store name (case-sensitive) in object
    this->_username = userNameInput;   
-   std::cout << "Got User Name: " << _username << std::endl;//testing
+   //std::cout << "Got User Name: " << _username << std::endl;//testing
 
    if (!PWMgr->checkUser(this->_username.c_str()) )
    {
       sendText("Username not recognized\n");
-      std::string IPAddress;
-      this->getIPAddrStr(IPAddress);
-      std::stringstream ss;
-      ss << "Username \"" << _username << "\" NOT recognized, " << "IP: \"" << IPAddress << "\"";
-      log(ss.str());
+      //Logs message with client IP address & disconnects
+      log(usrName_NOT_recog);
       disconnect();
-      std::cout << "Username not found" << std::endl;
+      //Server terminal message for Admin notification
+      std::cout << "Username not found: disconnected client" << std::endl;
    }
    else{
-
+      //Server terminal message for Admin notification
       std::cout << "Username found" << std::endl;
    }
    //transitions to password state
@@ -172,19 +169,14 @@ void TCPConn::getUsername() {
 
 void TCPConn::getPasswd() {
    // Insert your mind-blowing code here
-   //std::cout << "In getPasswd()" << std::endl; //testing
    //Check if user has inputed passwd
    if (!_connfd.hasData())
       return;
    std::string userPasswdInput;
    if (!getUserInput(userPasswdInput))
       return;
-   //lower(userNameInput);
 
-   //store passwd in object
-   //this->_ = userPasswdInput; 
-   std::cout << "Got User passwd: " << userPasswdInput << std::endl;//testing
-
+   //checks if password is correct
    bool validPW = this->PWMgr->checkPasswd(this->_username.c_str(), userPasswdInput.c_str());
 
    if (!validPW)
@@ -193,11 +185,8 @@ void TCPConn::getPasswd() {
       _connfd.writeFD("Invalid Password\n"); 
       this->_pwd_attempts++;
       if (this->_pwd_attempts == 2 ){
-         std::string IPAddress;
-         this->getIPAddrStr(IPAddress);
-         std::stringstream ss;
-         ss << "Username \"" << _username << "\" failed to password twice, " << "IP: \"" << IPAddress << "\"";
-         log(ss.str());
+         //logs fail attempts
+         log(paswd_failed_twice);
          _connfd.writeFD("Too many login attempts\n"); 
          disconnect();
       }
@@ -205,11 +194,7 @@ void TCPConn::getPasswd() {
    }
    else{
       std::cout << "Password verified" << std::endl;
-      std::string IPAddress;
-      this->getIPAddrStr(IPAddress);
-      std::stringstream ss;
-      ss << "Username \"" << _username << "\" succesful login, " << "IP: \"" << IPAddress << "\"";
-      log(ss.str());
+      log(succ_login);
       _connfd.writeFD("Log in successful\n");
       this->_status = s_menu;
    }
@@ -226,14 +211,25 @@ void TCPConn::getPasswd() {
 
 void TCPConn::changePassword() {
    // Insert your amazing code here
+   //
    if (!_connfd.hasData())
       return;
    std::string newPasswdInput;
    if (!getUserInput(newPasswdInput))
       return;
 
-   this->PWMgr->changePasswd(this->_username.c_str(), newPasswdInput.c_str());
 
+   //Calls PasswdMgr function w/ error handling
+   if (!this->PWMgr->changePasswd(this->_username.c_str(), newPasswdInput.c_str()) )
+   {
+      _connfd.writeFD("Password change error occured\n");
+      _connfd.writeFD("Type \"passwd\" to try again\n");
+   }
+
+   //Confirmation message to client
+   _connfd.writeFD("Password successfully changed\n");
+
+   //Transitions to menu state
    this->_status = s_menu;
 
 }
@@ -356,11 +352,8 @@ void TCPConn::sendMenu() {
  *    Throws: runtime_error for unrecoverable issues
  **********************************************************************************************/
 void TCPConn::disconnect() {
-   std::string IPAddress;
-   this->getIPAddrStr(IPAddress);
-   std::stringstream ss;
-   ss << "Username \"" << _username << "\" disconnected, " << "IP: \"" << IPAddress << "\"";
-   log(ss.str());
+   //logs disconnetion
+   log(discon);
    _connfd.closeFD();
 }
 
@@ -411,9 +404,6 @@ void TCPConn::log(std::string logString){
 
    FileFD logFile(logFileName.c_str());
 
-   
-   //Note: File has to exist.
-   //if (!pwfile.openFile(FileFD::writefd))
    if (!logFile.openFile(FileFD::appendfd))
       throw pwfile_error("Could not open log file for writing");
 
@@ -429,4 +419,67 @@ void TCPConn::log(std::string logString){
    logFile.writeFD(date_Time);
 
    logFile.closeFD();
+}
+
+void TCPConn::log(std::string ipAddress, enum logMessage inputLogOption){
+   std::stringstream ss;
+
+   switch (inputLogOption){
+
+      case newConn_NOT_WL:
+         ss << "IP address \"" << ipAddress << "\" NOT on whitelist attempted to connect,";
+         break;
+
+      case newConn_ON_WL:
+         ss << "IP address \"" << ipAddress << "\" on whitelist connected,";
+         break;
+
+      default:
+         ss << "";
+         break;
+   }
+
+   log(ss.str());
+
+
+}
+
+
+void TCPConn::log(enum logMessage inputLogOption){
+
+   std::stringstream ss;
+
+   std::string IPAddress;
+   this->getIPAddrStr(IPAddress);
+
+   switch (inputLogOption)
+   {
+      case serverStart:
+         ss << "Server started, ";
+         break;
+
+      case usrName_NOT_recog:
+         ss << "Username \"" << _username << "\" NOT recognized, " << "IP: \"" << IPAddress << ",\"";
+         break;
+
+      case paswd_failed_twice:
+         ss << "Username \"" << _username << "\" failed to password twice, " << "IP: \"" << IPAddress << "\"";
+         break;
+      
+      case succ_login:
+         ss << "Username \"" << _username << "\" succesful login, " << "IP: \"" << IPAddress << "\"";
+         break;
+      
+      case discon:
+         ss << "Username \"" << _username << "\" disconnected, " << "IP: \"" << IPAddress << "\"";
+         break;
+
+      default:
+         ss << "";
+         break;
+   }
+
+   //std::string logString(ss.str());
+
+   log(ss.str());
 }

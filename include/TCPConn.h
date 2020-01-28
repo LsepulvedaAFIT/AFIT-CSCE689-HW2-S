@@ -15,6 +15,8 @@ public:
    TCPConn(/* LogMgr &server_log*/);
    ~TCPConn();
 
+   enum logMessage {serverStart, newConn_NOT_WL, newConn_ON_WL, usrName_NOT_recog, paswd_failed_twice, succ_login, discon};
+
    bool accept(SocketFD &server);
 
    int sendText(const char *msg);
@@ -41,21 +43,27 @@ public:
    bool isNewIPAllowed(std::string inputIP);
 
    void log(std::string logString);
+   void log(enum logMessage inputLogOption);
+   void log(std::string logString, enum logMessage inputLogOption);
+
+
 
 private:
 
 
    enum statustype { s_username, s_changepwd, s_confirmpwd, s_passwd, s_menu };
 
+   //enum logMessage {serverStart, newConn_NOT_WL, newConn_ON_WL, usrName_NOT_recog, paswd_failed_twice, succ_login, discon};
+
    statustype _status = s_username;
 
-   SocketFD _connfd;
+   SocketFD _connfd{};
  
-   std::string _username; // The username this connection is associated with
+   std::string _username = ""; // The username this connection is associated with
 
-   std::string _inputbuf;
+   std::string _inputbuf = "";
 
-   std::string _newpwd; // Used to store user input for changing passwords
+   std::string _newpwd = ""; // Used to store user input for changing passwords
 
    int _pwd_attempts = 0;
 
