@@ -105,7 +105,7 @@ bool PasswdMgr::changePasswd(const char *name, const char *passwd) {
    //Find the name in passwd file ans stores the location in the file in offset variable
    while (!eof) {
       ret_hash.clear();
-      ret_salt.clear();
+      in_salt.clear();
       std::string tempBuffer;
       ssize_t bytes = pwfile.readStr(tempBuffer);
       offset = offset + bytes + 1;

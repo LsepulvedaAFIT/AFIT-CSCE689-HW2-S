@@ -393,7 +393,7 @@ bool TCPConn::isNewIPAllowed(std::string inputIP){
       }
    }
 
-   std::cout << "IP NOT FOUND on whitelist" << std::endl;
+   //std::cout << "IP NOT FOUND on whitelist" << std::endl;
    return false;
 
 }
