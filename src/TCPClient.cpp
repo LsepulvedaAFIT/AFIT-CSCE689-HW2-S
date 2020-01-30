@@ -133,7 +133,7 @@ int TCPClient::readStdin() {
    _in_buf += readbuf;
 
    // Did we either fill up the buffer or is there a newline/carriage return?
-   int sendto;
+   unsigned int sendto;
    if (_in_buf.length() >= stdin_bufsize)
       sendto = _in_buf.length();
    else if ((sendto = _in_buf.find("\n")) == std::string::npos) {

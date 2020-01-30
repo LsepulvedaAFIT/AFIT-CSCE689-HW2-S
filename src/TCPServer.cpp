@@ -30,7 +30,7 @@ TCPServer::~TCPServer() {
 
 void TCPServer::bindSvr(const char *ip_addr, short unsigned int port) {
 
-   struct sockaddr_in servaddr;
+   //struct sockaddr_in servaddr;
 
    // _server_log.writeLog("Server started.");
    this->_serverLog->log(TCPConn::serverStart);
@@ -57,15 +57,15 @@ void TCPServer::listenSvr() {
    timespec sleeptime;
    sleeptime.tv_sec = 0;
    sleeptime.tv_nsec = 100000000;
-   int num_read = 0;
+   //int num_read = 0;
 
    // Start the server socket listening
    _sockfd.listenFD(5);
 
     
    while (online) {
-      struct sockaddr_in cliaddr;
-      socklen_t len = sizeof(cliaddr);
+      //struct sockaddr_in cliaddr;
+      //socklen_t len = sizeof(cliaddr);
 
       if (_sockfd.hasData()) {
          TCPConn *new_conn = new TCPConn();

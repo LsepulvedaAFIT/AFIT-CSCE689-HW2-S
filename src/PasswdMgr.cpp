@@ -102,6 +102,7 @@ bool PasswdMgr::changePasswd(const char *name, const char *passwd) {
 
    bool eof = false;
    
+   //Find the name in passwd file ans stores the location in the file in offset variable
    while (!eof) {
       ret_hash.clear();
       ret_salt.clear();
@@ -122,26 +123,34 @@ bool PasswdMgr::changePasswd(const char *name, const char *passwd) {
       pwfile.readBytes(in_salt, 16);
       offset = offset + 48;
       tempBuffer.clear();
-      ssize_t b2 = pwfile.readStr(tempBuffer);
+      pwfile.readStr(tempBuffer);
       offset = offset + 1;
    }
 
+   //Hashes the new passwd and creates new salt
    ret_hash.clear();
    hashArgon2(ret_hash, ret_salt, passwd, &in_salt);
 
    pwfile.closeFD();
 
+   //opens file to write new hash and salt
    FileFD pwfile2(_pwd_file.c_str());
    if (!pwfile2.openFile(FileFD::writefd))
       throw pwfile_error("Could not open passwd file for reading");
 
    int fd = pwfile2.getFD();
 
+   //goes to the location of of the previos user hash
    lseek(fd, offset, SEEK_SET);
 
-   writeHash(pwfile2, ret_hash, ret_salt);
+   //overwrites exiting hash and salt with the new 
+   int writeResult = writeHash(pwfile2, ret_hash, ret_salt);
 
    pwfile2.closeFD();
+
+   if (writeResult == 0){
+      return false;
+   }
 
    return true;
 }
@@ -164,13 +173,14 @@ bool PasswdMgr::readUser(FileFD &pwfile, std::string &name, std::vector<uint8_t>
 {
 
    // Insert your perfect code here!
-   //pwfile.readFD(name);
+   //checks if it is the end of file
    if (pwfile.readStr(name) == 0){
       return false;
    }   
    
    std::string tempString;
 
+   //reads hash & salt 
    pwfile.readBytes(hash, 32);
    pwfile.readBytes(salt, 16);
    pwfile.readStr(tempString);
@@ -193,6 +203,7 @@ bool PasswdMgr::readUser(FileFD &pwfile, std::string &name, std::vector<uint8_t>
 
 int PasswdMgr::writeUser(FileFD &pwfile, std::string &name, std::vector<uint8_t> &hash, std::vector<uint8_t> &salt)
 {
+   //writes the name, hash, and salt
    int results;
    results = pwfile.writeFD(name);
    results = pwfile.writeFD("\n");
@@ -205,6 +216,7 @@ int PasswdMgr::writeUser(FileFD &pwfile, std::string &name, std::vector<uint8_t>
 
 int PasswdMgr::writeHash(FileFD &pwfile, std::vector<uint8_t> &hash, std::vector<uint8_t> &salt)
 {
+   //writes hash and salt
    int results;
    results = pwfile.writeBytes(hash);
    results = pwfile.writeBytes(salt);
@@ -273,6 +285,7 @@ bool PasswdMgr::findUser(const char *name, std::vector<uint8_t> &hash, std::vect
 void PasswdMgr::hashArgon2(std::vector<uint8_t> &ret_hash, std::vector<uint8_t> &ret_salt, 
                            const char *in_passwd, std::vector<uint8_t> *in_salt) {
    // Hash those passwords!!!!
+   //code based off usage example at https://github.com/P-H-C/phc-winner-argon2
    int HASHLEN = 32;
    int SALTLEN = 16;
 
@@ -281,9 +294,11 @@ void PasswdMgr::hashArgon2(std::vector<uint8_t> &ret_hash, std::vector<uint8_t> 
    uint8_t salt[SALTLEN];
    memset( salt, 0x00, SALTLEN );
 
+   //checks if new salt is needs to be created
    if (in_salt->empty())
    {
       ret_salt.clear();
+      //creates salt
       for (int i = 0; i < 16; i++){
          int randomNum = rand() % 30;
          ret_salt.push_back(randomNum);
@@ -297,7 +312,7 @@ void PasswdMgr::hashArgon2(std::vector<uint8_t> &ret_hash, std::vector<uint8_t> 
       }
    }
 
-   //not needed
+   //convert char * to uint8_t as needed for argon2 function
    uint8_t *pwd = (uint8_t *)strdup(in_passwd);
    uint32_t pwdlen = strlen((char *)pwd);
 
@@ -309,12 +324,13 @@ void PasswdMgr::hashArgon2(std::vector<uint8_t> &ret_hash, std::vector<uint8_t> 
    //argon2i_hash_raw(t_cost, m_cost, parallelism, pwd, pwdlen, in_salt, SALTLEN, hash1, HASHLEN);
    argon2i_hash_raw(t_cost, m_cost, parallelism, pwd, pwdlen, salt, SALTLEN, hash1, HASHLEN);
 
+   //pushing returned hash in to vector container
    for (int i = 0; i < 32; i++){
       ret_hash.push_back(hash1[i]);
    }
 
-   //delete
-   //stdup
+   //delete created memory
+   delete pwd;
 
 }
 

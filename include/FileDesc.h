@@ -89,7 +89,7 @@ public:
 
       int read_units = results / datasize;
       buf.reserve(read_units);
-      for (unsigned int i=0; i< read_units; i++) {
+      for (int i=0; i < read_units; i++) {
          buf.push_back((T) bytebuf[i*datasize]);
       }
 

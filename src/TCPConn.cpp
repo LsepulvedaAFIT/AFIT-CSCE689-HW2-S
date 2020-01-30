@@ -257,7 +257,7 @@ bool TCPConn::getUserInput(std::string &cmd) {
    _inputbuf += readbuf;
 
    // If it doesn't have a carriage return, then it's not a command
-   int crpos;
+   unsigned int crpos;
    if ((crpos = _inputbuf.find("\n")) == std::string::npos)
       return false;
 
@@ -393,7 +393,7 @@ bool TCPConn::isNewIPAllowed(std::string inputIP){
       }
    }
 
-   std::cout << "Match NOT FOUND!" << std::endl;
+   std::cout << "IP NOT FOUND on whitelist" << std::endl;
    return false;
 
 }
